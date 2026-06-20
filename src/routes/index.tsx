@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useMemo, useState } from 'react'
 import lapvioTrackdays from '../../data/lapvio/trackdays.json'
 
 export const Route = createFileRoute('/')({
@@ -13,8 +14,6 @@ type Trackday = {
   organizer: string
   price: PriceView
   sourceUrl: string
-  relevance: string
-  note: string
 }
 
 type PriceView = {
@@ -34,8 +33,26 @@ type LapvioTrackday = {
   currency: string | null
 }
 
+type OrganizerFilter = 'all' | 'corners.cz' | 'BM Racing' | 'Special Drive' | 'Drivers Club'
+type CircuitFilter = 'all' | 'cz' | 'foreign' | 'nordschleife'
+
 const EUR_TO_CZK = 24.175
 const MAX_VISIBLE_ROWS = 48
+
+const favoriteOrganizers: Array<{ id: OrganizerFilter; label: string }> = [
+  { id: 'all', label: 'Všichni' },
+  { id: 'corners.cz', label: 'Corners' },
+  { id: 'BM Racing', label: 'BM Racing' },
+  { id: 'Special Drive', label: 'Special Drive' },
+  { id: 'Drivers Club', label: 'Drivers Club' },
+]
+
+const circuitFilters: Array<{ id: CircuitFilter; label: string }> = [
+  { id: 'all', label: 'Všechny okruhy' },
+  { id: 'cz', label: 'České okruhy' },
+  { id: 'foreign', label: 'Zahraniční' },
+  { id: 'nordschleife', label: 'Nordschleife' },
+]
 
 const interestingCircuitNames = [
   'autodrom most',
@@ -58,12 +75,20 @@ const interestingCircuitNames = [
 const importedTrackdays = lapvioTrackdays as Array<LapvioTrackday>
 const trackdays = importedTrackdays.map(toTrackday).sort(compareTrackdays)
 const interestingTrackdays = trackdays.filter(isInterestingTrackday)
-const visibleTrackdays = interestingTrackdays.slice(0, MAX_VISIBLE_ROWS)
-const visibleCircuits = new Set(visibleTrackdays.map((event) => event.circuit))
-const priceKnownCount = visibleTrackdays.filter((event) => event.price.sortValue !== null).length
-const earliestEvent = visibleTrackdays.at(0)
 
 function Home() {
+  const [organizerFilter, setOrganizerFilter] = useState<OrganizerFilter>('all')
+  const [circuitFilter, setCircuitFilter] = useState<CircuitFilter>('all')
+
+  const filteredTrackdays = useMemo(
+    () =>
+      interestingTrackdays
+        .filter((event) => matchesOrganizerFilter(event, organizerFilter))
+        .filter((event) => matchesCircuitFilter(event, circuitFilter)),
+    [organizerFilter, circuitFilter],
+  )
+
+  const visibleTrackdays = filteredTrackdays.slice(0, MAX_VISIBLE_ROWS)
   return (
     <main className="page-shell">
       <header className="app-header">
@@ -77,29 +102,39 @@ function Home() {
         </div>
       </header>
 
-      <section className="summary-strip" aria-label="Přehled importu">
-        <div>
-          <span>Zobrazeno</span>
-          <strong>{visibleTrackdays.length}</strong>
+      <section className="quick-filters" aria-label="Rychlé filtry">
+        <div className="filter-group">
+          <h2>Pořadatel</h2>
+          <div className="filter-chips">
+            {favoriteOrganizers.map((filter) => (
+              <button
+                type="button"
+                className={organizerFilter === filter.id ? 'active' : undefined}
+                key={filter.id}
+                onClick={() => setOrganizerFilter(filter.id)}
+              >
+                {filter.label}
+                <span>{countForOrganizer(filter.id, circuitFilter)}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          <span>Okruhy</span>
-          <strong>{visibleCircuits.size}</strong>
+        <div className="filter-group">
+          <h2>Okruhy</h2>
+          <div className="filter-chips">
+            {circuitFilters.map((filter) => (
+              <button
+                type="button"
+                className={circuitFilter === filter.id ? 'active' : undefined}
+                key={filter.id}
+                onClick={() => setCircuitFilter(filter.id)}
+              >
+                {filter.label}
+                <span>{countForCircuit(filter.id, organizerFilter)}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div>
-          <span>S cenou</span>
-          <strong>{priceKnownCount}</strong>
-        </div>
-        <div>
-          <span>Nejbližší</span>
-          <strong>{earliestEvent ? formatCompactDate(earliestEvent.date) : 'N/A'}</strong>
-        </div>
-      </section>
-
-      <section className="criteria-bar" aria-label="Aktuální výběr">
-        <span>Primárně CZ, SK, AT a vybrané okolní okruhy</span>
-        <span>Nordschleife ponechaná jako výjimka</span>
-        <span>Ceny v Kč jsou orientační</span>
       </section>
 
       <section className="table-panel" aria-label="Trackday termíny">
@@ -110,7 +145,6 @@ function Home() {
               Seřazeno podle data, omezeno na okruhy v prvním osobním výběru.
             </p>
           </div>
-          <a href="https://www.lapvio.com/cs/trackdays?country=CZ">Lapvio CZ</a>
         </div>
 
         <div className="table-wrap">
@@ -122,34 +156,42 @@ function Home() {
                 <th>Pořadatel</th>
                 <th>Země</th>
                 <th>Cena</th>
-                <th>Poznámka</th>
                 <th aria-label="Detail" />
               </tr>
             </thead>
             <tbody>
-              {visibleTrackdays.map((event) => (
-                <tr key={event.id}>
-                  <td data-label="Termín">
-                    <time dateTime={event.date}>{formatDate(event.date)}</time>
+              {visibleTrackdays.length > 0 ? (
+                visibleTrackdays.map((event) => (
+                  <tr key={event.id}>
+                    <td data-label="Termín">
+                      <time dateTime={event.date}>{formatDate(event.date)}</time>
                   </td>
                   <td data-label="Okruh">
                     <strong>{event.circuit}</strong>
-                    <span>{event.relevance}</span>
                   </td>
-                  <td data-label="Pořadatel">{event.organizer}</td>
-                  <td data-label="Země">
-                    <span className="country-pill">{event.country}</span>
-                  </td>
-                  <td data-label="Cena" className="price-cell">
-                    <strong>{event.price.primary}</strong>
-                    {event.price.original ? <span>{event.price.original}</span> : null}
-                  </td>
-                  <td data-label="Poznámka">{event.note}</td>
-                  <td className="detail-cell">
-                    <a href={event.sourceUrl}>Detail</a>
+                    <td data-label="Pořadatel">{event.organizer}</td>
+                    <td data-label="Země">
+                      <span className="flag-pill" title={event.country}>
+                        {getCountryFlag(event.country)}
+                        <span className="sr-only">{event.country}</span>
+                      </span>
+                    </td>
+                    <td data-label="Cena" className="price-cell">
+                      <strong>{event.price.primary}</strong>
+                      {event.price.original ? <span>{event.price.original}</span> : null}
+                    </td>
+                    <td className="detail-cell">
+                      <a href={event.sourceUrl}>Detail</a>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="empty-row">
+                  <td colSpan={6}>
+                    Pro tuhle kombinaci filtrů zatím v importu není žádný termín.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -169,8 +211,6 @@ function toTrackday(event: LapvioTrackday): Trackday {
     organizer: event.organizer,
     price: formatPrice(event.priceFrom, event.currency),
     sourceUrl: event.sourceUrl,
-    relevance: getRelevance(event.circuit, country),
-    note: getNote(event.circuit, country),
   }
 }
 
@@ -191,35 +231,35 @@ function compareTrackdays(a: Trackday, b: Trackday) {
   return interestRank(a) - interestRank(b)
 }
 
+function matchesOrganizerFilter(event: Trackday, filter: OrganizerFilter) {
+  return filter === 'all' || event.organizer === filter
+}
+
+function matchesCircuitFilter(event: Trackday, filter: CircuitFilter) {
+  if (filter === 'all') return true
+  if (filter === 'cz') return event.country === 'CZ'
+  if (filter === 'foreign') return event.country !== 'CZ'
+
+  return normalize(event.circuit).includes('nurburgring nordschleife')
+}
+
+function countForOrganizer(filter: OrganizerFilter, circuitFilter: CircuitFilter) {
+  return interestingTrackdays
+    .filter((event) => matchesOrganizerFilter(event, filter))
+    .filter((event) => matchesCircuitFilter(event, circuitFilter)).length
+}
+
+function countForCircuit(filter: CircuitFilter, organizerFilter: OrganizerFilter) {
+  return interestingTrackdays
+    .filter((event) => matchesCircuitFilter(event, filter))
+    .filter((event) => matchesOrganizerFilter(event, organizerFilter)).length
+}
+
 function interestRank(event: Trackday) {
   if (event.country === 'CZ') return 0
   if (event.country === 'SK' || event.country === 'AT') return 1
   if (normalize(event.circuit).includes('nurburgring nordschleife')) return 2
   return 3
-}
-
-function getRelevance(circuit: string, country: string) {
-  const normalizedCircuit = normalize(circuit)
-
-  if (country === 'CZ') return 'domácí priorita'
-  if (country === 'SK' || country === 'AT') return 'rozumný dojezd'
-  if (normalizedCircuit.includes('nurburgring nordschleife')) return 'výjimka'
-  if (country === 'DE') return 'ověřit dojezd'
-
-  return 'okolní země'
-}
-
-function getNote(circuit: string, country: string) {
-  const normalizedCircuit = normalize(circuit)
-
-  if (normalizedCircuit.includes('most')) return 'vhodné na víkend / večer'
-  if (normalizedCircuit.includes('brno')) return 'ověřit kalendář'
-  if (normalizedCircuit.includes('sosnova')) return 'krátký okruh'
-  if (normalizedCircuit.includes('slovakiaring')) return 'delší cesta, pořád relevantní'
-  if (normalizedCircuit.includes('nurburgring nordschleife')) return 'ponechat jako výjimku'
-  if (country === 'AT') return 'počítat s cestou den předem'
-
-  return 'k ručnímu posouzení'
 }
 
 function formatPrice(price: number | null, currency: string | null): PriceView {
@@ -265,13 +305,6 @@ function formatDate(value: string) {
   }).format(parseDate(value))
 }
 
-function formatCompactDate(value: string) {
-  return new Intl.DateTimeFormat('cs-CZ', {
-    day: '2-digit',
-    month: '2-digit',
-  }).format(parseDate(value))
-}
-
 function formatCzk(value: number) {
   return `${formatNumber(value)} Kč`
 }
@@ -295,6 +328,19 @@ function formatRate(value: number) {
 
 function parseDate(value: string) {
   return new Date(`${value.slice(0, 10)}T12:00:00`)
+}
+
+function getCountryFlag(country: string) {
+  const flags: Record<string, string> = {
+    AT: '🇦🇹',
+    CZ: '🇨🇿',
+    DE: '🇩🇪',
+    HU: '🇭🇺',
+    PL: '🇵🇱',
+    SK: '🇸🇰',
+  }
+
+  return flags[country] ?? country
 }
 
 function normalize(value: string) {
