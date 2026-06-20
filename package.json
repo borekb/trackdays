@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "dev:portless": "portless \"$(git branch --show-current | tr '/' '-').trackdays\" pnpm dev",
+    "dev:portless": "PORTLESS_PORT=1355 portless \"$(git branch --show-current | tr '/' '-').trackdays\" pnpm dev",
     "import:lapvio": "node --experimental-strip-types scripts/import-lapvio.ts",
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview",

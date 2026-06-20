@@ -10,8 +10,8 @@ pnpm dev:portless
 ```
 
 Portless starts the app behind a stable HTTPS URL:
-`https://<branch>.trackdays.localhost/`, for example
-<https://main.trackdays.localhost/>.
+`https://<branch>.trackdays.localhost:1355/`, for example
+<https://main.trackdays.localhost:1355/>.
 
 Plain dev server URLs such as <http://localhost:3000> are not the primary
 workflow because that port may belong to another local app.

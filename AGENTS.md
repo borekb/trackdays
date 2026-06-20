@@ -27,7 +27,7 @@ This repository contains a personal trackday planning app for comparing public t
 ## Dev Server
 
 - Prefer the portless workflow: `pnpm dev:portless`.
-- The app URL is `https://<branch-name>.trackdays.localhost/`, where slashes in the branch name are replaced with dashes.
+- The app URL is `https://<branch-name>.trackdays.localhost:1355/`, where slashes in the branch name are replaced with dashes.
 - Do not assume <http://localhost:3000> points to this app; it may be another local dev server.
 
 ## Data Imports
