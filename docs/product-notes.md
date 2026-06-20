@@ -12,6 +12,13 @@ The app is a personal alternative to broad public trackday listings. The first u
 - Calendar: Google Calendar read-only import for availability overlays.
 - Travel: route estimates from Pardubice, ideally cached server-side because map APIs are paid and rate-limited.
 
+## Local Data Storage
+
+- Imported Lapvio data lives in `data/lapvio/trackdays.json`.
+- The importer currently targets `CZ`, `SK`, `AT`, `DE`, `PL`, and `HU`; add nearby countries in `scripts/import-lapvio.ts` as needed.
+- Refresh with `pnpm import:lapvio`; review the JSON diff before committing.
+- Raw HTML caches should stay out of Git, for example under `.cache/lapvio/`.
+
 ## Initial Views
 
 - Calendar: month/week view with trackdays and personal availability in one timeline.

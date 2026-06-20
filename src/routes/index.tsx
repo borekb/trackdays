@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import lapvioTrackdays from '../../data/lapvio/trackdays.json'
 
 export const Route = createFileRoute('/')({
   component: Home,
@@ -10,53 +11,26 @@ type Trackday = {
   country: string
   date: string
   organizer: string
-  travelTime: string
-  distanceKm: number
+  price: string
+  sourceUrl: string
   score: 'fit' | 'maybe' | 'far'
 }
 
-const trackdays: Array<Trackday> = [
-  {
-    id: 'most-jul',
-    circuit: 'Autodrom Most',
-    country: 'CZ',
-    date: '2026-07-18',
-    organizer: 'Lapvio sample',
-    travelTime: '2 h 15 min',
-    distanceKm: 195,
-    score: 'fit',
-  },
-  {
-    id: 'brno-aug',
-    circuit: 'Automotodrom Brno',
-    country: 'CZ',
-    date: '2026-08-03',
-    organizer: 'Lapvio sample',
-    travelTime: '1 h 55 min',
-    distanceKm: 155,
-    score: 'fit',
-  },
-  {
-    id: 'slovakiaring-sep',
-    circuit: 'Slovakiaring',
-    country: 'SK',
-    date: '2026-09-12',
-    organizer: 'Lapvio sample',
-    travelTime: '3 h 10 min',
-    distanceKm: 285,
-    score: 'maybe',
-  },
-  {
-    id: 'nordschleife-oct',
-    circuit: 'Nordschleife',
-    country: 'DE',
-    date: '2026-10-04',
-    organizer: 'Lapvio sample',
-    travelTime: '7 h 20 min',
-    distanceKm: 690,
-    score: 'maybe',
-  },
-]
+type LapvioTrackday = {
+  sourceSlug: string
+  sourceUrl: string
+  dateStart: string
+  organizer: string
+  circuit: string
+  countryCode: string | null
+  priceFrom: number | null
+  currency: string | null
+}
+
+const importedTrackdays = lapvioTrackdays as Array<LapvioTrackday>
+const trackdays = importedTrackdays.map(toTrackday)
+const circuitCount = new Set(trackdays.map((event) => event.circuit)).size
+const countryCodes = Array.from(new Set(trackdays.map((event) => event.country))).sort()
 
 const calendarDays = [
   { day: 'Po', date: '13', label: 'Práce', tone: 'muted' },
@@ -69,9 +43,6 @@ const calendarDays = [
 ]
 
 function Home() {
-  const fitCount = trackdays.filter((event) => event.score === 'fit').length
-  const maybeCount = trackdays.filter((event) => event.score === 'maybe').length
-
   return (
     <main className="shell">
       <header className="topbar" aria-label="Trackdays overview">
@@ -90,19 +61,19 @@ function Home() {
 
       <section className="summary-grid" aria-label="Planning summary">
         <article>
-          <span>Relevantní</span>
-          <strong>{fitCount}</strong>
-          <small>do 2,5 hodiny cesty</small>
+          <span>Importováno</span>
+          <strong>{trackdays.length}</strong>
+          <small>trackdays z Lapvio</small>
         </article>
         <article>
-          <span>Na zvážení</span>
-          <strong>{maybeCount}</strong>
-          <small>delší cesta nebo výjimka</small>
+          <span>Okruhy</span>
+          <strong>{circuitCount}</strong>
+          <small>okruhů v importu</small>
         </article>
         <article>
-          <span>Další integrace</span>
-          <strong>GCal</strong>
-          <small>volno, prázdniny, blokace</small>
+          <span>Rozsah</span>
+          <strong>{countryCodes.length}</strong>
+          <small>{countryCodes.join(', ')}</small>
         </article>
       </section>
 
@@ -140,7 +111,7 @@ function Home() {
 
       <section className="event-list" aria-label="Candidate trackdays">
         <div className="section-heading">
-          <p>Vzorková data</p>
+          <p>Lapvio import</p>
           <h2>Kandidáti k dalšímu filtrování</h2>
         </div>
         <div className="events">
@@ -148,23 +119,21 @@ function Home() {
             <article className="event-row" key={event.id}>
               <div>
                 <span className={`status ${event.score}`}>
-                  {event.score === 'fit' ? 'sedí' : 'ověřit'}
+                  {event.country}
                 </span>
-                <h3>{event.circuit}</h3>
+                <h3>
+                  <a href={event.sourceUrl}>{event.circuit}</a>
+                </h3>
                 <p>
                   {event.country} · {event.organizer}
                 </p>
               </div>
               <time dateTime={event.date}>
-                {new Intl.DateTimeFormat('cs-CZ', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                }).format(new Date(event.date))}
+                {formatDate(event.date)}
               </time>
               <div className="travel">
-                <strong>{event.travelTime}</strong>
-                <span>{event.distanceKm} km</span>
+                <strong>{event.price}</strong>
+                <span>Lapvio detail</span>
               </div>
             </article>
           ))}
@@ -172,4 +141,38 @@ function Home() {
       </section>
     </main>
   )
+}
+
+function toTrackday(event: LapvioTrackday): Trackday {
+  return {
+    id: event.sourceSlug,
+    circuit: event.circuit,
+    country: event.countryCode ?? 'N/A',
+    date: event.dateStart,
+    organizer: event.organizer,
+    price: formatPrice(event.priceFrom, event.currency),
+    sourceUrl: event.sourceUrl,
+    score: 'fit',
+  }
+}
+
+function formatDate(value: string) {
+  const datePart = value.slice(0, 10)
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${datePart}T12:00:00`))
+}
+
+function formatPrice(price: number | null, currency: string | null) {
+  if (price === null || currency === null) {
+    return 'Cena na dotaz'
+  }
+
+  return new Intl.NumberFormat('cs-CZ', {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: 0,
+  }).format(price)
 }

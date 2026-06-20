@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:portless": "portless \"$(git branch --show-current | tr '/' '-').trackdays\" pnpm dev",
+    "import:lapvio": "node --experimental-strip-types scripts/import-lapvio.ts",
     "build": "vite build && tsc --noEmit",
     "preview": "vite preview",
     "start": "node .output/server/index.mjs",

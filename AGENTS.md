@@ -29,3 +29,9 @@ This repository contains a personal trackday planning app for comparing public t
 - Prefer the portless workflow: `pnpm dev:portless`.
 - The app URL is `https://<branch-name>.trackdays.localhost/`, where slashes in the branch name are replaced with dashes.
 - Do not assume <http://localhost:3000> points to this app; it may be another local dev server.
+
+## Data Imports
+
+- Use `pnpm import:lapvio` to refresh the local Lapvio trackday snapshot.
+- The importer must read public HTML pages, not Lapvio `/api/` endpoints.
+- Commit normalized JSON under `data/lapvio/`; do not commit raw HTML caches.

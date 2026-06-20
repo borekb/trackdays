@@ -308,6 +308,15 @@ h2 {
   font-size: 1.1rem;
 }
 
+.event-row a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.event-row a:hover {
+  color: var(--coquelicot);
+}
+
 .event-row p,
 .event-row time,
 .travel span {
