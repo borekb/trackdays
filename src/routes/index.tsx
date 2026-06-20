@@ -97,7 +97,6 @@ function Home() {
           <h1>Nejbližší relevantní termíny</h1>
         </div>
         <div className="header-meta">
-          <span>Start: Pardubice</span>
           <span>Kurz EUR: {formatRate(EUR_TO_CZK)} Kč</span>
         </div>
       </header>
