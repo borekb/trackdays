@@ -1,5 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router'
-import type { CSSProperties } from 'react'
 import lapvioTrackdays from '../../data/lapvio/trackdays.json'
 
 export const Route = createFileRoute('/')({
@@ -8,346 +7,299 @@ export const Route = createFileRoute('/')({
 
 type Trackday = {
   id: string
-  title: string
+  date: string
   circuit: string
   country: string
-  date: string
   organizer: string
-  price: string
+  price: PriceView
   sourceUrl: string
-  imageUrl: string | null
-  address: string | null
-  monthKey: string
-  monthLabel: string
-  day: string
-  monthShort: string
-  travelHint: string
-  score: 'fit' | 'maybe' | 'far'
+  relevance: string
+  note: string
+}
+
+type PriceView = {
+  primary: string
+  original: string | null
+  sortValue: number | null
 }
 
 type LapvioTrackday = {
   sourceSlug: string
   sourceUrl: string
-  title: string
   dateStart: string
   organizer: string
   circuit: string
   countryCode: string | null
-  address: string | null
   priceFrom: number | null
   currency: string | null
-  imageUrl: string | null
 }
 
-type MonthGroup = {
-  key: string
-  label: string
-  events: Array<Trackday>
-}
+const EUR_TO_CZK = 24.175
+const MAX_VISIBLE_ROWS = 48
+
+const interestingCircuitNames = [
+  'autodrom most',
+  'most',
+  'creditas autodrom brno',
+  'autodrom brno',
+  'automotodrom brno',
+  'autodrom sosnova',
+  'sosnova',
+  'vysoke myto',
+  'pisek',
+  'autoklub hradiste',
+  'slovakiaring',
+  'red bull ring',
+  'wachauring melk',
+  'pannonia ring',
+  'nurburgring nordschleife',
+]
 
 const importedTrackdays = lapvioTrackdays as Array<LapvioTrackday>
-const trackdays = importedTrackdays
-  .map(toTrackday)
-  .sort((a, b) => a.date.localeCompare(b.date))
-
-const featuredTrackdays = trackdays.slice(0, 36)
-const monthGroups = groupByMonth(featuredTrackdays)
-const circuitCount = new Set(trackdays.map((event) => event.circuit)).size
-const countryStats = Array.from(
-  trackdays.reduce((counts, event) => {
-    counts.set(event.country, (counts.get(event.country) ?? 0) + 1)
-    return counts
-  }, new Map<string, number>()),
-)
-  .sort(([a], [b]) => a.localeCompare(b))
-
-const primaryCountries = countryStats.slice(0, 8)
-const czechCandidates = trackdays.filter((event) => event.country === 'CZ').length
-
-const planningFilters = [
-  'Open pitlane',
-  'Sessions / skupiny',
-  'Do 3 h z Pardubic',
-  'Volný víkend',
-  'CZ / SK / AT',
-  'Nordschleife výjimka',
-]
+const trackdays = importedTrackdays.map(toTrackday).sort(compareTrackdays)
+const interestingTrackdays = trackdays.filter(isInterestingTrackday)
+const visibleTrackdays = interestingTrackdays.slice(0, MAX_VISIBLE_ROWS)
+const visibleCircuits = new Set(visibleTrackdays.map((event) => event.circuit))
+const priceKnownCount = visibleTrackdays.filter((event) => event.price.sortValue !== null).length
+const earliestEvent = visibleTrackdays.at(0)
 
 function Home() {
   return (
-    <main className="lapvio-shell">
-      <header className="site-nav" aria-label="Trackdays planner navigation">
-        <a className="brand" href="/">
-          <span className="brand-mark">TD</span>
-          <span>Trackdays</span>
-        </a>
-        <nav aria-label="Primary">
-          <a href="#events">Trackdays</a>
-          <a href="#calendar">Kalendář</a>
-          <a href="#map">Mapa</a>
-        </nav>
-        <div className="nav-actions">
-          <button type="button">GCal</button>
-          <button type="button" className="primary-action">
-            Aktualizovat import
-          </button>
+    <main className="page-shell">
+      <header className="app-header">
+        <div>
+          <p className="kicker">Trackdays planner</p>
+          <h1>Nejbližší relevantní termíny</h1>
+        </div>
+        <div className="header-meta">
+          <span>Start: Pardubice</span>
+          <span>Kurz EUR: {formatRate(EUR_TO_CZK)} Kč</span>
         </div>
       </header>
 
-      <section className="hero-panel" aria-label="Trackday overview">
-        <div className="hero-copy">
-          <p className="eyebrow">Pardubice origin planner</p>
-          <h1>
-            Nadcházející
-            <span>trackdays.</span>
-          </h1>
-          <p className="hero-text">
-            Soukromý pohled na Lapvio import, dostupnost v kalendáři a geografii
-            okruhů, které dávají smysl pro cestu z Pardubic.
-          </p>
+      <section className="summary-strip" aria-label="Přehled importu">
+        <div>
+          <span>Zobrazeno</span>
+          <strong>{visibleTrackdays.length}</strong>
         </div>
-
-        <div className="hero-stats" aria-label="Import summary">
-          <article>
-            <strong>{trackdays.length}</strong>
-            <span>Importováno</span>
-          </article>
-          <article>
-            <strong>{czechCandidates}</strong>
-            <span>České akce</span>
-          </article>
-          <article>
-            <strong>{circuitCount}</strong>
-            <span>Okruhy</span>
-          </article>
+        <div>
+          <span>Okruhy</span>
+          <strong>{visibleCircuits.size}</strong>
+        </div>
+        <div>
+          <span>S cenou</span>
+          <strong>{priceKnownCount}</strong>
+        </div>
+        <div>
+          <span>Nejbližší</span>
+          <strong>{earliestEvent ? formatCompactDate(earliestEvent.date) : 'N/A'}</strong>
         </div>
       </section>
 
-      <section className="filter-rail" aria-label="Event filters">
-        <div className="country-strip" aria-label="Countries">
-          <button type="button" className="chip active">
-            Vše
-          </button>
-          {primaryCountries.map(([country, count]) => (
-            <button type="button" className="chip" key={country}>
-              {country}
-              <span>{count}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="type-strip" aria-label="Planning filters">
-          {planningFilters.map((filter) => (
-            <button type="button" className="chip ghost" key={filter}>
-              {filter}
-            </button>
-          ))}
-        </div>
+      <section className="criteria-bar" aria-label="Aktuální výběr">
+        <span>Primárně CZ, SK, AT a vybrané okolní okruhy</span>
+        <span>Nordschleife ponechaná jako výjimka</span>
+        <span>Ceny v Kč jsou orientační</span>
       </section>
 
-      <section className="planning-grid" aria-label="Planning workspace">
-        <article className="calendar-card" id="calendar">
-          <div className="panel-heading">
-            <span>GCal overlay</span>
-            <h2>Červenec 2026</h2>
-          </div>
-          <div className="calendar-mini" aria-label="Availability calendar">
-            {calendarDays.map((item) => (
-              <div className={`calendar-day ${item.tone}`} key={item.date}>
-                <span>{item.day}</span>
-                <strong>{item.date}</strong>
-                <p>{item.label}</p>
-              </div>
-            ))}
-          </div>
-        </article>
-
-        <article className="map-card" id="map">
-          <div className="panel-heading">
-            <span>Dojezd</span>
-            <h2>Praktické okruhy</h2>
-          </div>
-          <div className="route-map" role="img" aria-label="Stylized Central Europe map">
-            <span className="map-node home">Pardubice</span>
-            <span className="map-node north">Most</span>
-            <span className="map-node south">Brno</span>
-            <span className="map-node east">Slovakiaring</span>
-            <span className="map-node west">Nordschleife</span>
-          </div>
-        </article>
-
-        <article className="decision-card">
-          <div className="panel-heading">
-            <span>Priorita</span>
-            <h2>Osobní scoring</h2>
-          </div>
-          <div className="score-list">
-            <p>
-              <strong>CZ/SK/AT</strong>
-              Kandidáti k ručnímu ověření v kalendáři.
-            </p>
-            <p>
-              <strong>DE západ</strong>
-              Spíš vyřadit, pokud nejde o výjimečný okruh.
-            </p>
-            <p>
-              <strong>Nordschleife</strong>
-              Samostatná výjimka i přes dojezd.
-            </p>
-          </div>
-        </article>
-      </section>
-
-      <section className="event-board" id="events" aria-label="Candidate events">
-        <div className="event-board-heading">
+      <section className="table-panel" aria-label="Trackday termíny">
+        <div className="table-toolbar">
           <div>
-            <p className="eyebrow">Lapvio import</p>
-            <h2>Kandidáti k filtrování</h2>
+            <h2>Termíny</h2>
+            <p>
+              Seřazeno podle data, omezeno na okruhy v prvním osobním výběru.
+            </p>
           </div>
-          <div className="view-toggle" aria-label="View mode">
-            <button type="button" className="active" aria-label="Grid view">
-              ▦
-            </button>
-            <button type="button" aria-label="List view">
-              ≡
-            </button>
-          </div>
+          <a href="https://www.lapvio.com/cs/trackdays?country=CZ">Lapvio CZ</a>
         </div>
 
-        {monthGroups.map((group) => (
-          <section className="month-section" key={group.key} aria-label={group.label}>
-            <h3>
-              {group.label}
-              <span>{group.events.length} akcí</span>
-            </h3>
-            <div className="event-grid">
-              {group.events.map((event) => (
-                <article className="trackday-card" key={event.id}>
-                  <a href={event.sourceUrl} aria-label={`${event.circuit} detail`}>
-                    <div
-                      className="trackday-art"
-                      style={getEventImageStyle(event.imageUrl)}
-                    >
-                      <time dateTime={event.date}>
-                        <strong>{event.day}</strong>
-                        <span>{event.monthShort}</span>
-                      </time>
-                    </div>
-                    <div className="trackday-body">
-                      <div className="card-meta">
-                        <span className={`score ${event.score}`}>{event.country}</span>
-                        <span>{event.travelHint}</span>
-                      </div>
-                      <h4>{event.circuit}</h4>
-                      <p>{event.organizer}</p>
-                      <div className="card-footer">
-                        <strong>{event.price}</strong>
-                        <span>Detail →</span>
-                      </div>
-                    </div>
-                  </a>
-                </article>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Termín</th>
+                <th>Okruh</th>
+                <th>Pořadatel</th>
+                <th>Země</th>
+                <th>Cena</th>
+                <th>Poznámka</th>
+                <th aria-label="Detail" />
+              </tr>
+            </thead>
+            <tbody>
+              {visibleTrackdays.map((event) => (
+                <tr key={event.id}>
+                  <td data-label="Termín">
+                    <time dateTime={event.date}>{formatDate(event.date)}</time>
+                  </td>
+                  <td data-label="Okruh">
+                    <strong>{event.circuit}</strong>
+                    <span>{event.relevance}</span>
+                  </td>
+                  <td data-label="Pořadatel">{event.organizer}</td>
+                  <td data-label="Země">
+                    <span className="country-pill">{event.country}</span>
+                  </td>
+                  <td data-label="Cena" className="price-cell">
+                    <strong>{event.price.primary}</strong>
+                    {event.price.original ? <span>{event.price.original}</span> : null}
+                  </td>
+                  <td data-label="Poznámka">{event.note}</td>
+                  <td className="detail-cell">
+                    <a href={event.sourceUrl}>Detail</a>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </section>
-        ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
   )
 }
 
-const calendarDays = [
-  { day: 'Po', date: '13', label: 'Práce', tone: 'muted' },
-  { day: 'Út', date: '14', label: 'Volno', tone: 'open' },
-  { day: 'St', date: '15', label: 'Rodina', tone: 'blocked' },
-  { day: 'Čt', date: '16', label: 'Volno', tone: 'open' },
-  { day: 'Pá', date: '17', label: 'Most večer', tone: 'event' },
-  { day: 'So', date: '18', label: 'Most', tone: 'event' },
-  { day: 'Ne', date: '19', label: 'Rezerva', tone: 'open' },
-]
-
 function toTrackday(event: LapvioTrackday): Trackday {
-  const date = parseDate(event.dateStart)
   const country = event.countryCode ?? 'N/A'
 
   return {
     id: event.sourceSlug,
-    title: event.title,
+    date: event.dateStart,
     circuit: event.circuit,
     country,
-    date: event.dateStart,
     organizer: event.organizer,
     price: formatPrice(event.priceFrom, event.currency),
     sourceUrl: event.sourceUrl,
-    imageUrl: event.imageUrl,
-    address: event.address,
-    monthKey: event.dateStart.slice(0, 7),
-    monthLabel: formatMonth(date),
-    day: new Intl.DateTimeFormat('cs-CZ', { day: '2-digit' }).format(date),
-    monthShort: new Intl.DateTimeFormat('cs-CZ', { month: 'short' })
-      .format(date)
-      .replace('.', ''),
-    travelHint: getTravelHint(country),
-    score: getScore(country),
+    relevance: getRelevance(event.circuit, country),
+    note: getNote(event.circuit, country),
   }
 }
 
-function groupByMonth(events: Array<Trackday>): Array<MonthGroup> {
-  const groups = new Map<string, MonthGroup>()
-
-  for (const event of events) {
-    const group = groups.get(event.monthKey) ?? {
-      key: event.monthKey,
-      label: event.monthLabel,
-      events: [],
-    }
-    group.events.push(event)
-    groups.set(event.monthKey, group)
+function isInterestingTrackday(event: Trackday) {
+  if (event.country === 'CZ' || event.country === 'SK' || event.country === 'AT') {
+    return true
   }
 
-  return Array.from(groups.values())
+  const normalizedCircuit = normalize(event.circuit)
+
+  return interestingCircuitNames.some((name) => normalizedCircuit.includes(name))
+}
+
+function compareTrackdays(a: Trackday, b: Trackday) {
+  const dateDiff = a.date.localeCompare(b.date)
+  if (dateDiff !== 0) return dateDiff
+
+  return interestRank(a) - interestRank(b)
+}
+
+function interestRank(event: Trackday) {
+  if (event.country === 'CZ') return 0
+  if (event.country === 'SK' || event.country === 'AT') return 1
+  if (normalize(event.circuit).includes('nurburgring nordschleife')) return 2
+  return 3
+}
+
+function getRelevance(circuit: string, country: string) {
+  const normalizedCircuit = normalize(circuit)
+
+  if (country === 'CZ') return 'domácí priorita'
+  if (country === 'SK' || country === 'AT') return 'rozumný dojezd'
+  if (normalizedCircuit.includes('nurburgring nordschleife')) return 'výjimka'
+  if (country === 'DE') return 'ověřit dojezd'
+
+  return 'okolní země'
+}
+
+function getNote(circuit: string, country: string) {
+  const normalizedCircuit = normalize(circuit)
+
+  if (normalizedCircuit.includes('most')) return 'vhodné na víkend / večer'
+  if (normalizedCircuit.includes('brno')) return 'ověřit kalendář'
+  if (normalizedCircuit.includes('sosnova')) return 'krátký okruh'
+  if (normalizedCircuit.includes('slovakiaring')) return 'delší cesta, pořád relevantní'
+  if (normalizedCircuit.includes('nurburgring nordschleife')) return 'ponechat jako výjimku'
+  if (country === 'AT') return 'počítat s cestou den předem'
+
+  return 'k ručnímu posouzení'
+}
+
+function formatPrice(price: number | null, currency: string | null): PriceView {
+  if (price === null || currency === null) {
+    return {
+      primary: 'Cena na dotaz',
+      original: null,
+      sortValue: null,
+    }
+  }
+
+  if (currency === 'CZK') {
+    return {
+      primary: formatCzk(price),
+      original: null,
+      sortValue: price,
+    }
+  }
+
+  if (currency === 'EUR') {
+    const converted = Math.round(price * EUR_TO_CZK)
+
+    return {
+      primary: formatCzk(converted),
+      original: `(${formatEur(price)})`,
+      sortValue: converted,
+    }
+  }
+
+  return {
+    primary: `${formatNumber(price)} ${currency}`,
+    original: null,
+    sortValue: null,
+  }
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('cs-CZ', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(parseDate(value))
+}
+
+function formatCompactDate(value: string) {
+  return new Intl.DateTimeFormat('cs-CZ', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(parseDate(value))
+}
+
+function formatCzk(value: number) {
+  return `${formatNumber(value)} Kč`
+}
+
+function formatEur(value: number) {
+  return `€${formatNumber(value)}`
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('cs-CZ', {
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatRate(value: number) {
+  return new Intl.NumberFormat('cs-CZ', {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  }).format(value)
 }
 
 function parseDate(value: string) {
   return new Date(`${value.slice(0, 10)}T12:00:00`)
 }
 
-function formatMonth(date: Date) {
-  return new Intl.DateTimeFormat('cs-CZ', {
-    month: 'long',
-    year: 'numeric',
-  })
-    .format(date)
-    .toUpperCase()
-}
-
-function getTravelHint(country: string) {
-  if (country === 'CZ') return 'blízko'
-  if (country === 'SK' || country === 'AT' || country === 'PL') return 'rozumné'
-  if (country === 'DE') return 'prověřit'
-  return 'dlouhé'
-}
-
-function getScore(country: string): Trackday['score'] {
-  if (country === 'CZ' || country === 'SK' || country === 'AT') return 'fit'
-  if (country === 'PL' || country === 'HU' || country === 'DE') return 'maybe'
-  return 'far'
-}
-
-function formatPrice(price: number | null, currency: string | null) {
-  if (price === null || currency === null) {
-    return 'Cena na dotaz'
-  }
-
-  return new Intl.NumberFormat('cs-CZ', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(price)
-}
-
-function getEventImageStyle(imageUrl: string | null): CSSProperties | undefined {
-  if (!imageUrl) return undefined
-
-  return { '--event-image': `url(${imageUrl})` } as CSSProperties
+function normalize(value: string) {
+  return value
+    .toLocaleLowerCase('cs-CZ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
