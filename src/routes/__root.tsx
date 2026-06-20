@@ -21,7 +21,10 @@ export const Route = createRootRoute({
           'Personal trackday planner for calendar availability and travel distance.',
       },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },
+      { rel: 'stylesheet', href: appCss },
+    ],
   }),
   component: RootComponent,
 })

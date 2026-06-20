@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Trackdays">
+  <rect width="64" height="64" rx="14" fill="#ff3800"/>
+  <path
+    d="M17 43c-5-7-3-17 5-22 8-6 20-5 25 1 4 4 4 9 1 12-3 4-9 4-14 1-4-2-7-2-9 1-2 2-1 5 2 7 5 3 14 2 22-2"
+    fill="none"
+    stroke="#fffaf4"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
