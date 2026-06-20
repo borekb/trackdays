@@ -12,6 +12,7 @@ type Trackday = {
   circuit: string
   country: string
   organizer: string
+  isFavoriteOrganizer: boolean
   price: PriceView
   sourceUrl: string
 }
@@ -33,18 +34,17 @@ type LapvioTrackday = {
   currency: string | null
 }
 
-type OrganizerFilter = 'all' | 'corners.cz' | 'BM Racing' | 'Special Drive' | 'Drivers Club'
+type OrganizerFilter = 'all' | 'favorites'
 type CircuitFilter = 'all' | 'cz' | 'foreign' | 'nordschleife'
 
 const EUR_TO_CZK = 24.175
 const MAX_VISIBLE_ROWS = 48
 
-const favoriteOrganizers: Array<{ id: OrganizerFilter; label: string }> = [
+const favoriteOrganizerNames = ['corners.cz', 'BM Racing', 'Special Drive', 'Drivers Club']
+
+const organizerFilters: Array<{ id: OrganizerFilter; label: string }> = [
   { id: 'all', label: 'Všichni' },
-  { id: 'corners.cz', label: 'Corners' },
-  { id: 'BM Racing', label: 'BM Racing' },
-  { id: 'Special Drive', label: 'Special Drive' },
-  { id: 'Drivers Club', label: 'Drivers Club' },
+  { id: 'favorites', label: 'Oblíbení' },
 ]
 
 const circuitFilters: Array<{ id: CircuitFilter; label: string }> = [
@@ -106,12 +106,13 @@ function Home() {
         <div className="filter-group">
           <h2>Pořadatel</h2>
           <div className="filter-chips">
-            {favoriteOrganizers.map((filter) => (
+            {organizerFilters.map((filter) => (
               <button
                 type="button"
                 className={organizerFilter === filter.id ? 'active' : undefined}
                 key={filter.id}
                 onClick={() => setOrganizerFilter(filter.id)}
+                title={filter.id === 'favorites' ? favoriteOrganizerNames.join(', ') : undefined}
               >
                 {filter.label}
                 <span>{countForOrganizer(filter.id, circuitFilter)}</span>
@@ -162,13 +163,16 @@ function Home() {
             <tbody>
               {visibleTrackdays.length > 0 ? (
                 visibleTrackdays.map((event) => (
-                  <tr key={event.id}>
+                  <tr
+                    className={event.isFavoriteOrganizer ? 'favorite-organizer' : 'muted-organizer'}
+                    key={event.id}
+                  >
                     <td data-label="Termín">
                       <time dateTime={event.date}>{formatDate(event.date)}</time>
-                  </td>
-                  <td data-label="Okruh">
-                    <strong>{event.circuit}</strong>
-                  </td>
+                    </td>
+                    <td data-label="Okruh">
+                      <strong>{event.circuit}</strong>
+                    </td>
                     <td data-label="Pořadatel">{event.organizer}</td>
                     <td data-label="Země">
                       <span className="flag-pill" title={event.country}>
@@ -209,6 +213,7 @@ function toTrackday(event: LapvioTrackday): Trackday {
     circuit: event.circuit,
     country,
     organizer: event.organizer,
+    isFavoriteOrganizer: isFavoriteOrganizer(event.organizer),
     price: formatPrice(event.priceFrom, event.currency),
     sourceUrl: event.sourceUrl,
   }
@@ -232,7 +237,7 @@ function compareTrackdays(a: Trackday, b: Trackday) {
 }
 
 function matchesOrganizerFilter(event: Trackday, filter: OrganizerFilter) {
-  return filter === 'all' || event.organizer === filter
+  return filter === 'all' || event.isFavoriteOrganizer
 }
 
 function matchesCircuitFilter(event: Trackday, filter: CircuitFilter) {
@@ -247,6 +252,10 @@ function countForOrganizer(filter: OrganizerFilter, circuitFilter: CircuitFilter
   return interestingTrackdays
     .filter((event) => matchesOrganizerFilter(event, filter))
     .filter((event) => matchesCircuitFilter(event, circuitFilter)).length
+}
+
+function isFavoriteOrganizer(organizer: string) {
+  return favoriteOrganizerNames.includes(organizer)
 }
 
 function countForCircuit(filter: CircuitFilter, organizerFilter: OrganizerFilter) {

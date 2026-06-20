@@ -116,7 +116,7 @@ h1 {
 
 .quick-filters {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -253,6 +253,18 @@ tbody tr {
 
 tbody tr:hover {
   background: #fffaf7;
+}
+
+tbody tr.muted-organizer {
+  opacity: 0.52;
+}
+
+tbody tr.muted-organizer:hover {
+  opacity: 0.82;
+}
+
+tbody tr.favorite-organizer td:nth-child(3) {
+  font-weight: 760;
 }
 
 tbody tr:last-child td {
